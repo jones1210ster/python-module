@@ -1,0 +1,315 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Feb 13 14:37:27 2019
+
+@author: sukueicheng
+"""
+
+import datetime
+import xlwings as xw
+import pandas as pd
+import getpass
+import time
+import sql
+import self_made_func_PL as pl
+
+t1 = time.time()
+
+
+def GetYieldMonth(dat):
+    try:
+        return dat.month
+    except:
+        return None
+
+
+def ColorOfAOI(x):
+    if x[-2:] == "黑白":
+        return "黑白"
+    elif x[-2:] == "濃黑":
+        return "濃黑"
+    else:
+        return x[-1]
+
+
+def SeriesOfAOI(x):
+    n = len(x)-len(ColorOfAOI(x))-1
+    return x[:n]
+
+
+def send_error_mail(plant, string):
+    # 寄送錯誤訊息透過excel
+    app = xw.App(visible=False, add_book=False)
+    # wb = app.books.open(
+    #     r'C:\\Users\\cckuo\\Desktop\\Check_Time_SendMail2.xlsm')
+    wb = app.books.open(r'C:\\Users\\dcs_admin\\Desktop\\temp\\Check_Time_SendMail2.xlsm')
+    sht = wb.sheets('工作表1')
+    sht.range('A1').value = plant+string
+    wb.macro('main')()
+    wb.save()
+    sht.book.close()
+    app.quit()
+
+filepath = r'\\172.16.2.16\pl\Item list.xlsx'
+# filepath = r'C:\Users\cckuo\Desktop\Item list.xlsx'
+app_it = xw.App(visible=False, add_book=False)
+wb_it = app_it.books.open(filepath)
+# wb.activate(steal_focus=True)
+sht_it = wb_it.sheets("Ctrl item")
+item_df = wb_it.sheets['Item list'].range('A1:F'+str(wb_it.sheets['Item list'].range("A"+str(
+    wb_it.sheets['Item list'].range("A:A").rows.count)).end('up').row)).options(pd.DataFrame).value
+item_dict = {'ktp04': '料號', 'ktp05': '原反Lot', 'ktp06': '運轉日期', 'ktp061': '開始時間', 'ima02': '原反品名', 'ima021': '製程別', 'ima83': '幅寬', 'imt14': '廠別', 'ktp03': '班別', 'ktp12': '原反米數', 'ktq053_1': 'PVA品名', 'ktq05_1': 'PVA Lot',
+             'ktq053_2': '上TAC品名', 'ktq05_2': '上TAC Lot', 'ktq053_3': '下TAC品名', 'ktq05_3': '下TAC Lot', 'ktq053_4': '下PF品名', 'ktq05_4': '下PF Lot', 'ktq11_11': '上TAC糊 LOT', 'ktq11_21': '下TAC糊 LOT', 'ktq11_12': '上TAC糊 LOT2', 'ktq11_22': '下TAC糊 LOT2'}
+sht_it.book.close()
+app_it.quit()
+#
+plant_list = ['TPL1', 'TPL2', 'TPL3']
+#
+# plant_list = ['TPL2']
+id=0
+
+# 預設當天與前2天
+dat1 = datetime.date.today() - datetime.timedelta(days=3)
+dat2 = datetime.date.today()
+
+app = xw.App(visible=False, add_book=False)
+wb = app.books.open(r'C:\Users\cckuo\Desktop\log_data.xlsx')
+sht_info = wb.sheets('Info')
+
+TPL1_process_sql = sht_info.range("G9").value
+TPL2_process_sql = sht_info.range("G10").value
+TPL3_process_sql = sht_info.range("G11").value
+material_sql = sht_info.range("G12").value
+ctrl_sql = sht_info.range("G13").value
+qty_sql = sht_info.range("G14").value
+aoi_sql = sht_info.range("G15").value
+
+sht_info.book.close()
+app.quit()
+
+process_sql_list = {
+    'TPL1': TPL1_process_sql,
+    'TPL2': TPL2_process_sql,
+    'TPL3': TPL3_process_sql,
+    'TPL1_temp': 'templot',
+    'TPL2_temp': 'HK20201T5',
+    'TPL3_temp': 'templot'
+}
+db = sql.Db('PL_DB')
+
+for plant in plant_list:
+
+    try:
+        # 檔案路徑
+        datname = str(
+            (datetime.date.today() - datetime.timedelta(days=5)).year)[2:]+"_"+str(plant)
+        # filepath = r'C:\Users\cckuo\Desktop\20' + \
+        # str(datname)+'_Production_Information.xlsx'
+        filepath = r'\\172.16.2.16\pl\Production_Information\20' + \
+            str(datname)+'_Production_Information.xlsx'
+
+        # 開啟productionInfo
+        app_proInfo = xw.App(visible=False, add_book=False)
+        wb_proInfo = app_proInfo.books.open(filepath)
+        sht_proInfo = wb_proInfo.sheets("DataBase")
+        # 找 last row
+        rng = sht_proInfo.range('D2')
+        Data_dat = sht_proInfo.range('D'+str(rng.end('down').row)).value
+        # 判斷更新日
+        if dat1 > Data_dat.date():
+            dat1 = Data_dat.date()
+    except:
+        send_error_mail(plant, " ,   "+str(dat2) + " ,  開啟失敗(唯讀?)")
+        print('開啟失敗(唯讀?)')
+        sht_proInfo.book.close()
+        app_proInfo.quit()
+
+    try:
+        db.connect()
+        # print(eval(material_sql))
+        material_data = pd.read_sql(eval(material_sql), db.cnxn)
+        material_data['ktp05'] = material_data['ktp05'].str.strip()
+        material_data['KindOfWide'] = material_data['ima83'].apply(
+            pl.GetKindOfWide)
+        material_data['Series'] = material_data['ima02'].apply(
+            pl.GetSeriesFromLaminatedGrade)
+        material_data['KindOfPVA'] = material_data['ktq053_1'].apply(
+            pl.GetKindOfPVA)
+        material_data['PVASite'] = material_data['ktq05_1'].apply(
+            pl.GetSiteFromPVALot)
+        material_data['YieldDate'] = material_data['ktp05'].apply(
+            pl.GetDateFromLaminatedLot)
+        material_data['YieldMonth'] = material_data['YieldDate'].apply(
+            GetYieldMonth)
+
+        user = getpass.getuser()+'_py'
+        db.cursor = db.cnxn.cursor()
+        db.cursor.execute(
+            "INSERT INTO Lot_Serial (userid,idtime) VALUES ('" + user + "',GETDATE())")
+        db.cnxn.commit()
+        db.cursor.execute("SELECT @@IDENTITY AS max_row_id")
+
+        res = material_data
+        for j in range(len(res)):
+            if j == 0:
+                res.loc[len(res)+1] = 0
+                res['ktp05'].iat[len(res)-1] = process_sql_list[plant+'_temp']
+
+        # global id
+        for row in db.cursor.fetchall():
+            id = row.max_row_id
+            
+        for i in material_data.drop_duplicates('ktp05')['ktp05']:
+            db.cursor.execute(
+                "Insert Into lot_temp(id,lot) values("+str(id)+",'"+i+"')")
+            db.cnxn.commit()
+    except:
+        send_error_mail(plant, " ,   "+str(dat2) + " ,  資料庫連結失敗")
+        print('資料庫連結失敗')
+        sht_proInfo.book.close()
+        app_proInfo.quit()
+
+    try:
+        process_sql = process_sql_list[plant]
+        # print(eval(process_sql))
+        process_data = pd.read_sql(eval(process_sql), db.cnxn)
+        process_data['lot'] = process_data['lot'].str.strip()
+        process_data = process_data.rename(columns={'lot': 'ktp05'})
+        process_data = process_data[process_data['tagname'].notnull()]
+        process_data['CodeName'] = process_data.apply(lambda process_data: item_df.loc[list(
+            item_df['Tagname']).index(process_data['tagname']), 'Code'], axis=1)
+        process_pivot_table = pd.pivot_table(process_data, index=['ktp05'], columns=[
+                                             'CodeName'], values=['value'], fill_value='nan', aggfunc='first')
+        process_pivot_table = process_pivot_table.reset_index()
+
+        col = []
+        for i in range(len(process_pivot_table.columns)):
+            if i == 0:
+                col.append('ktp05')
+            else:
+                col.append(item_df.loc[list(item_df['Code']).index(
+                    process_pivot_table.columns[i][1]), 'Item'])
+
+        process_pivot_table.columns = col
+        res = pd.merge(res, process_pivot_table, how='outer', on='ktp05')
+    except:
+        send_error_mail(plant, " ,   "+str(dat2) + " ,  製程參數查詢失敗")
+        print('製程參數查詢失敗')
+        sht_proInfo.book.close()
+        app_proInfo.quit()
+
+    try:
+        # print(eval(ctrl_sql))
+        ctrl_data = pd.read_sql(eval(ctrl_sql), db.cnxn)
+        ctrl_data['qbn04'] = ctrl_data['qbn04'].str.strip()
+        ctrl_data = ctrl_data.rename(columns={'qbm04': 'ktp05'})
+        ctrl_data['CodeName'] = ctrl_data.apply(lambda ctrl_data: item_df.loc[list(
+            item_df['Tagname']).index(ctrl_data['qbn04']), 'Code'], axis=1)
+        ctrl_pivot_table = pd.pivot_table(ctrl_data, index=['ktp05'], columns=[
+                                          'CodeName', 'qbnn031'], values=['qbnn04'], fill_value='nan', aggfunc='first')
+        # reset index
+        ctrl_pivot_table = ctrl_pivot_table.reset_index()
+        col = []
+        for i in range(len(ctrl_pivot_table.columns)):
+            if i == 0:
+                col.append('ktp05')
+            else:
+                col.append(item_df.loc[list(item_df['Code']).index(
+                    ctrl_pivot_table.columns[i][1]), 'Item']+str(ctrl_pivot_table.columns[i][2]))
+        ctrl_pivot_table.columns = col
+        ctrl_pivot_table['ktp05'] = ctrl_pivot_table['ktp05'].str.strip()
+        res = pd.merge(res, ctrl_pivot_table, how='outer', on='ktp05')
+    except ValueError:
+        print('光學藥液資料未上傳完成')
+        sht_proInfo.book.close()
+        app_proInfo.quit()
+        continue
+    except:
+        send_error_mail(plant, " ,   "+str(dat2) + " ,  光學藥液查詢失敗")
+        print('光學藥液查詢失敗')
+        sht_proInfo.book.close()
+        app_proInfo.quit()
+
+    try:
+        # print(eval(qty_sql))
+        qty_data = pd.read_sql(eval(qty_sql), db.cnxn)
+        qty_data = qty_data.rename(columns={'lot': 'ktp05'})
+        qty_pivot_table = pd.pivot_table(qty_data, index=['ktp05'], columns=[
+                                         'Item', 'StartEnd', 'Layer'], values=['Value'], fill_value='nan', aggfunc='first')
+        # reset index
+        qty_pivot_table = qty_pivot_table.reset_index()
+        col = []
+        for i in range(len(qty_pivot_table.columns)):
+            if i == 0:
+                col.append('ktp05')
+            else:
+                col.append(
+                    qty_pivot_table.columns[i][1]+qty_pivot_table.columns[i][2])
+
+        qty_pivot_table.columns = col
+        qty_pivot_table['ktp05'] = qty_pivot_table['ktp05'].str.strip()
+        res = pd.merge(res, qty_pivot_table, how='outer', on='ktp05')
+
+        global aoi_data
+        # print(eval(aoi_sql))
+        aoi_data = pd.read_sql(eval(aoi_sql), db.cnxn)
+        aoi_data = aoi_data.rename(columns={'LOT': 'ktp05'})
+        aoi_pivot_table = pd.pivot_table(aoi_data, index=['ktp05'], columns=[
+                                         'SERI', 'NCOL', 'NSIZE'], values=['NVAL'], fill_value='nan', aggfunc='first')
+        # reset index
+        aoi_pivot_table = aoi_pivot_table.reset_index()
+        col = []
+        for i in range(len(aoi_pivot_table.columns)):
+            if i == 0:
+                col.append('ktp05')
+            else:
+                col.append(
+                    aoi_pivot_table.columns[i][1]+aoi_pivot_table.columns[i][2]+aoi_pivot_table.columns[i][3])
+
+        aoi_pivot_table.columns = col
+        aoi_pivot_table['ktp05'] = aoi_pivot_table['ktp05'].str.strip()
+        res = pd.merge(res, aoi_pivot_table, how='outer', on='ktp05')
+    except:
+        send_error_mail(plant, " ,   "+str(dat2) + " ,  qty/aoi查詢失敗")
+        print('qty/aoi查詢失敗')
+        sht_proInfo.book.close()
+        app_proInfo.quit()
+
+    try:
+        for i in item_dict.keys():
+            res = res.rename(columns={i: item_dict[i]})
+        res = res.replace(r'\s*', '', regex=True)
+        res = res.replace('nan', '')
+        res = res.drop(len(res)-1)  # 移除TEMPLOT
+    except:
+        send_error_mail(plant, " ,   "+str(dat2) + " ,  res重組失敗")
+        print('res重組失敗')
+        sht_proInfo.book.close()
+        app_proInfo.quit()
+
+    global res2
+
+    # 貼上查詢出的資料
+    for i in range(3, rng.end('down').row):
+
+        if sht_proInfo.range('D'+str(i)).value.date().strftime('%Y-%m-%d') == res['運轉日期'][0]:
+            res2 = res.reset_index()
+            plantcolumns = {'TPL1': 618, 'TPL2': 905, 'TPL3': 974}
+            if len(res2.columns) != plantcolumns[plant]:
+                send_error_mail(plant, " ,   "+str(dat2) + " ,  列數短缺 異常")
+                print("列數短缺")
+                sht_proInfo.book.close()
+                app_proInfo.quit()
+                app_proInfo.kill()
+            else:
+                sht_proInfo.range('A'+str(i)).value = res2.values
+                print(len(res2), len(res2.columns))
+                print(plant+" ok")
+
+                sht_proInfo.autofit()
+                wb_proInfo.save()
+                sht_proInfo.book.close()
+                app_proInfo.quit()
+
+                print(' Time : ' + str(time.time()-t1))
+                break
