@@ -1,0 +1,222 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Mar  2 16:49:31 2021
+
+@author: cckuo
+"""
+
+import xlwings as xw
+import ctypes
+import time
+import sys
+import tkinter as tk
+from tkinter import ttk
+from tkinter import filedialog
+
+
+def msgbox(title, text, style):
+    return ctypes.windll.user32.MessageBoxW(0, text, title, style)
+
+
+def closing():
+    msgbox('Warning', '即將離開，程式關閉', 0)
+    win.destroy()
+
+
+def all_closing():
+    msgbox('Warning', '即將離開，程式關閉', 0)
+    root.destroy()
+    win.destroy()
+
+
+app = xw.App(visible=False, add_book=False)
+
+wb = app.books.open(r'\\172.16.2.16\pl\upload lot.xlsx')
+sht_info = wb.sheets('Info')
+
+TPL1_sql = sht_info.range("G1").value
+TPL2_sql = sht_info.range("G2").value
+TPL3_sql = sht_info.range("G3").value
+TPL1_sql_1 = sht_info.range("G5").value
+TPL2_sql_1 = sht_info.range("G6").value
+TPL3_sql_1 = sht_info.range("G7").value
+
+app.quit()
+
+server_dcs = database_dcs = username_dcs = password_dcs = table_name = file_path = ''
+
+
+def print_selection():
+    global server_dcs, database_dcs, username_dcs, password_dcs, table_name, plant
+    plant = Selected_pl.get()
+    if plant == "TPL3":
+        server_dcs = '172.16.24.32'
+        database_dcs = 'Runtime'
+        username_dcs = 'SPC03'
+        password_dcs = 'SPC03'
+        table_name = 'History'
+    else:
+        server_dcs = 'insql2'
+        database_dcs = 'Runtime'
+        username_dcs = 'SPC'
+        password_dcs = 'spc123'
+        table_name = 'dbo.v_AnalogHistory'
+
+
+def description():
+
+    handbook = tk.Tk()
+    handbook.geometry('470x180')
+    handbook.title('程式使用說明')
+    text = tk.Text(handbook, height=13)
+    text.insert(
+        'insert', "\n-------------------------程式使用說明-------------------------\n\n")
+    text.insert('insert', "1、請將要取得資料的批號輸入，中間以「Enter」隔開。\n\n")
+    text.insert('insert', "   PS：考量DCS的loading，故批號一次最多10個。\n\n")
+    text.insert('insert', "2、點按「確認」按鈕，程式會將查詢的資料轉為csv檔。\n\n")
+    text.insert('insert', "3、於跳出的視窗選擇csv檔的存放路徑，程式會自動將檔案儲存。\n\n")
+    text.insert('insert', "4、如有問題或其它需求或建議，煩請聯絡PL推進郭建青(MVPN：566026)。\n\n")
+    text.pack()
+    text.config(state='disabled')
+    handbook.mainloop()
+
+
+def folder_path_selected():
+    global file_path
+    root = tk.Tk()
+    root.withdraw()
+    file_path = filedialog.askdirectory()
+    root.destroy()
+
+
+def main():
+
+    import pyodbc
+    import pandas as pd
+    global root, plant
+
+    t1 = time.time()
+    plant = Selected_pl.get()
+    lot_text = text.get("1.0", tk.END+"-1c")
+    list_lot = lot_text.replace(' ', '').split("\n")
+    list_lot = [i for i in list_lot if i != '']
+    if len(list_lot) == 0:
+        msgbox('Warning', '您沒有輸入原反Lot，請確認，謝謝。', 0)
+        closing()
+        sys.exit()
+    if len(list_lot) > 11:
+        msgbox('Warning', '查詢的原反Lot數最多僅能10批，謝謝。', 0)
+        closing()
+        sys.exit()
+    dict_pair = {'TPL1': ['Z', 'C'], 'TPL2': ['H', 'U'], 'TPL3': ['R', '3']}
+
+    for i in list_lot:
+        if i[0] != dict_pair[plant][0] and i[0] != dict_pair[plant][1]:
+            msgbox('Warning', '『'+i+'』非'+plant+'的生產批號，請確認，謝謝。', 0)
+            closing()
+            sys.exit()
+
+    str_sql_lot = "','".join(list_lot)
+    # print("'"+str_sql_lot+"'")
+
+    material_sql = "select concat(ktp06,' ',ktp061) as 'Start time',concat(ktp07,' ',ktp071) as 'End time',ktp05 from Bmaterial where ktp05 in ("+"'"+str_sql_lot+"')"
+
+    server = '172.16.1.168'
+    database = 'PL_DB'
+    username = 'pl_barcode'
+    password = '1qaz2wsx'
+
+    if plant == "TPL3":
+        server_dcs = '172.16.24.32'
+        database_dcs = 'Runtime'
+        username_dcs = 'SPC03'
+        password_dcs = 'SPC03'
+        table_name = 'History'
+    else:
+        server_dcs = 'insql2'
+        database_dcs = 'Runtime'
+        username_dcs = 'SPC'
+        password_dcs = 'spc123'
+        table_name = 'dbo.v_AnalogHistory'
+
+    cnxn = pyodbc.connect('DRIVER={SQL Server};SERVER='+server +
+                          ';DATABASE='+database+';UID='+username+';PWD=' + password)
+    df_dcs_data = pd.read_sql(material_sql, cnxn)
+    df_dcs_data['Start time'] = df_dcs_data['Start time'].astype('datetime64')
+    df_dcs_data['End time'] = df_dcs_data['End time'].astype('datetime64')
+    df_dcs_data.sort_values(by='Start time', inplace=True)
+
+    cnxn = pyodbc.connect('DRIVER={SQL Server};SERVER='+server_dcs +
+                          ';DATABASE='+database_dcs+';UID='+username_dcs+';PWD=' + password_dcs)
+    df_process_data = pd.DataFrame()
+
+    root = tk.Tk()
+    progress_bar = ttk.Progressbar(
+        root, orient='horizontal', length=286, mode='determinate')
+    progress_bar.pack()
+
+    list_cnt = [(100//len(list_lot))*x for x in range(1, len(list_lot))]
+    list_cnt.append(100)
+    progress_bar['maximum'] = 100
+
+    # 迭代df_dcs_data，將資料查出並堆疊成dataframe
+    for index, row in df_dcs_data.iterrows():
+
+        process_sql = "select datetime,tagname,value FROM "+table_name+" where  datetime >='"+str(row['Start time'])+"' and datetime <='" + str(row['End time'])+"' and wwRetrievalMode = 'Cyclic' and wwResolution=60000 and tagname in (" + \
+            eval(plant+"_sql")+") order by datetime"
+
+        df_tmp = pd.read_sql(process_sql, cnxn)
+        df_tmp['lot'] = row['ktp05']
+        df_process_data = pd.concat(
+            [df_process_data, df_tmp], axis=0, ignore_index=True)
+        progress_bar['value'] = list_cnt[index]
+        la_lot_msg = tk.Label(root, text="『"+row['ktp05'].strip(' ')+"』完成")
+        la_lot_msg.pack()
+        progress_bar.update()
+
+    # df_process_data['datetime'] = df_process_data['day']+df_process_data['time']
+    # df_process_data['datetime'] = df_process_data['datetime'].apply(
+    #     lambda x: datetime.datetime.strptime(x[0:10]+' '+x[10:15], '%Y-%m-%d %H:%M'))
+
+    # 移動lot欄位
+    # tmp_col = df_process_data.pop(df_process_data.columns[-2])
+    # df_process_data.insert(2, tmp_col.name, tmp_col)
+    costtime = time.time()-t1
+    folder_path_selected()
+    # to csv
+    df_process_data.to_csv(file_path+'\process_data(by min).csv')
+    msgbox('Result', '查詢完成並轉為csv檔！共耗用'+str(int(costtime)) + '秒。', 0)
+    all_closing()
+    root.mainloop()
+
+
+win = tk.Tk()
+plantlb1 = tk.LabelFrame(win, text='期別 : ')
+plantlb1.grid(row=0, column=0, columnspan=2, sticky=tk.N+tk.S)
+Selected_pl = tk.StringVar()
+Selected_pl.set("TPL1")
+plant = "TPL1"
+PL1 = tk.Radiobutton(plantlb1, text='TPL1', value='TPL1', variable=Selected_pl)
+PL1.pack(side=tk.LEFT)
+PL2 = tk.Radiobutton(plantlb1, text='TPL2', value='TPL2',
+                     variable=Selected_pl)  # , variable=selected
+PL2.pack(side=tk.LEFT)
+PL3 = tk.Radiobutton(plantlb1, text='TPL3', value='TPL3', variable=Selected_pl)
+PL3.pack(side=tk.LEFT)
+Textlb = tk.LabelFrame(win, text='Lot查詢：\n(請用『Enter』做間隔)')
+Textlb.grid(row=1, column=0, columnspan=2, sticky=tk.N+tk.S)
+
+text = tk.Text(Textlb, height=6, font=("Meiryo UI", 12), width=12)
+text.pack()
+Enterbu = tk.Button(win, text='確定', width=4, command=main)
+Enterbu.grid(row=2, column=0, sticky=tk.E)
+btn_Description = tk.Button(win, text='說明', command=description)
+btn_Description.grid(row=2, column=1, sticky=tk.W, padx=2)
+# 製作者基本資訊
+photo = tk.PhotoImage(file=r'\\172.16.2.16\pl\sumika.png')
+label = tk.Label(win, image=photo, width=102, height=56)
+label.image = photo
+label.grid(row=3, column=0)
+tk.Label(win, text='© 2021 Sumika\nDesigned by cckuo').grid(row=3, column=1)
+win.protocol("WM_DELETE_WINDOW", closing)
+win.mainloop()
