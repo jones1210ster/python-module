@@ -17,7 +17,7 @@ from self_made_func_PL import msgbox
 class Db:
 
     def __init__(self, host):
-        dict_host_info = {'PL_DB': ("172.16.1.168", "PL_DB", "ap_dcs", "ELU5iwHLZ7js"), 'TPL1_2_DCS': ("insql2", "RUNTIME", "SPC", "spc123"), 'TPL1_2_DCS': ("172.16.24.32", "RUNTIME", "SPC03", "SPC03")}
+        dict_host_info = {'PL_DB': ("172.16.1.168", "PL_DB", "ap_dcs", "ELU5iwHLZ7js"), 'TPL1_2_DCS': ("insql2", "RUNTIME", "SPC", "spc123"), 'TPL3_DCS': ("172.16.24.32", "RUNTIME", "SPC03", "SPC03")}
         try:
             self.server = dict_host_info[host][0]
             self.database = dict_host_info[host][1]
@@ -46,6 +46,7 @@ class Db:
 
 
 if __name__ == '__main__':
+#僅單元測試用,後續此段可改成 PASS
     db = Db('PL_DB')
     db.connect()
     # res = db.execute('select top 100 * from ocr_data')
