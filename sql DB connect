@@ -7,17 +7,19 @@ Created on  :   2021/06/19 19:21:21
 @Description:
 @Version    :   1.0
 '''
-
 import pyodbc
 import sys
 import pandas as pd
 from self_made_func_PL import msgbox
+import os
 
 
 class Db:
 
     def __init__(self, host):
-        dict_host_info = {'PL_DB': ("172.16.1.168", "PL_DB", "ap_dcs", "ELU5iwHLZ7js"), 'TPL1_2_DCS': ("insql2", "RUNTIME", "SPC", "spc123"), 'TPL3_DCS': ("172.16.24.32", "RUNTIME", "SPC03", "SPC03")}
+        dict_host_info = {'PL_DB': ("172.16.1.168", "PL_DB", "ap_dcs", "ELU5iwHLZ7js"), 'TPL1_2_DCS': (
+            "insql2", "RUNTIME", "SPC", "spc123"), 'TPL3_DCS': (
+            "172.16.24.32", "RUNTIME", "SPC03", "SPC03")}
         try:
             self.server = dict_host_info[host][0]
             self.database = dict_host_info[host][1]
@@ -25,7 +27,7 @@ class Db:
             self.password = dict_host_info[host][3]
         except KeyError:
             msgbox(
-                'Confirm', 'Can not find host.\nPlease confirm it or contact with anton (MVPN(566026), thank you.', 0)
+                'Confirm', 'Can not find host.\nPlease confirm it or contact with (MVPN(566026), thank you.', 0)
             sys.exit()
 
     def connect(self):
@@ -37,16 +39,21 @@ class Db:
         self.cursor.close()
         self.cnxn.close()
 
-    def execute(self, sql):
+    def query(self, sql):
         self.cursor.execute(sql)
         return self.cursor.fetchall()
+
+    def exec_none_query(self, sql):
+        self.cursor.execute(sql)
+        self.cnxn.commit()
 
     def query_to_dataframe(self, sql):
         return pd.read_sql(sql, self.cnxn)
 
-
+    
+    
 if __name__ == '__main__':
-#僅單元測試用,後續此段可改成 PASS
+#僅單元測試用,後續此段可改成 pass
     db = Db('PL_DB')
     db.connect()
     # res = db.execute('select top 100 * from ocr_data')
