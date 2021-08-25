@@ -1,0 +1,15 @@
+左下角設定 -> command palette -> open setting(json)
+貼入下面的這個,重開後,即可
+
+{
+    "workbench.editorAssociations": {
+        "*.ipynb": "jupyter-notebook"
+    },
+    "notebook.cellToolbarLocation": {
+        "default": "right",
+        "jupyter-notebook": "left"
+    },
+    "security.workspace.trust.untrustedFiles": "open",
+    "jupyter.experiments.optOutFrom": ["NativeNotebookEditor"],
+    "jupyter.experimental.debugging": true,
+}
