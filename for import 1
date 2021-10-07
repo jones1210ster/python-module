@@ -1,0 +1,364 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+'''
+@File       :   self_made_func_PL.py
+Created on  :   2021/05/03 14:04:51
+@Author     :   cckuo
+@Description:
+@Version    :   1.0
+'''
+
+'''
+Self-made functions對應說明如下：
+
+從原反品名取得Series  -->  GetSeriesFromLaminatedGrade
+從原反Lot取得日期     -->  GetDateFromLaminatedLot
+從原反品名取得延伸地  -->  GetPlantFromGrade
+從原反品名取得PF膜    -->  GetPFFromGrade
+從塗工Lot取得塗工日   -->  GetDateFromCoatingGelLot
+從塗工Lot取得塗工地   -->  GetPlantFromCoatingGelLot
+從原反品名取得幅寬    -->  GetWideFromGrade
+從鹼化Lot取得日期     -->  GetDateFromSaponifiedLot
+從原反品名取得膠種    -->  GetAdhesivesFromGrade
+從原反品名取得UV膠種類-->  GetKindOfUVAdhesivesFromGrade
+從PVA品名取得PVA種類  -->  GetKindOfPVA
+從PVALot取得PVA線別   -->  GetSiteFromPVALot
+從幅寬取得幅寬種類    -->  GetKindOfWide
+同Excel的Mid函數     -->  mid
+使用tkinter的Msgbox  -->  tk_msgbox
+非tkinter的Msgbox    -->  msgbox
+'''
+
+# 從原反品名取得延伸地
+
+
+def GetPlantFromGrade(x):
+    """
+    Parameters
+    ----------
+    x : String
+        請輸入原反品名.
+
+    Returns
+    -------
+    str
+        回傳延伸地.
+
+    """
+    import re
+
+    x = x.strip()
+    if x == '':
+        return None
+    elif re.search(r'.*ZS.*', x) != None:
+        return "TPL1"
+    elif re.search(r'.*HS.*', x) != None:
+        return "TPL2"
+    elif re.search(r'.*RS.*', x) != None:
+        return "TPL3"
+    elif re.search(r'.*LS.*', x) != None:
+        return "EPL2"
+    elif re.search(r'.*SS.*', x) != None:
+        return "EPL3"
+    elif re.search(r'.*PS.*', x) != None:
+        return "KPL2"
+    elif re.search(r'.*BS.*', x) != None:
+        return "KPL3"
+    elif re.search(r'.*QS.*', x) != None:
+        return "KPL5"
+    else:
+        return "Cannot judge."
+
+# 從PVA品名取得PVA種類
+
+
+def GetKindOfPVA(x):
+
+    x = x.strip()
+
+    if x == '':
+        return ""
+    elif "PS#7500" in x:
+        return "PS#7500"
+    elif "PE#6000" in x:
+        return "PE#6000"
+    elif "PE-E#6000" in x:
+        return "PE-E#6000"
+    elif "M-6000" in x:
+        return "M-6000"
+    elif "M-6020" in x:
+        return "M-6020"
+    elif "M-7500" in x:
+        return "M-7500"
+    elif "TS#4500" in x:
+        return "TS#4500"
+
+    else:
+        return "Cannot judge."
+
+# 原反品名取得幅寬
+
+
+def GetWideFromGrade(x):
+
+    import re
+
+    x = x.strip()
+
+    if x == '':
+        return None
+    if re.search(r'.*((\d\d\d\d)).*', x) != None:
+        return re.search(r'.*((\d\d\d\d)).*', x).group(1)
+    elif re.search(r'.*((\d\d\d)).*', x) != None:
+        return re.search(r'.*((\d\d\d)).*', x).group(1)
+    else:
+        return "Cannot got wide from Grade."
+
+# 從塗工Lot取得塗工日期
+
+
+def GetDateFromCoatingGelLot(x):
+
+    from datetime import datetime
+    x = x.strip()
+
+    if x == '':
+        return None
+    elif len(x) != 9 and len(x) != 10:
+        return "Cannot judge."
+    else:
+        if x[0] == '0':
+            yyyy = '202'+x[0]
+        else:
+            yyyy = '201'+x[0]
+        return datetime.strptime(yyyy+x[1:3]+x[3:5], '%Y%m%d')
+
+# 從塗工Lot取得塗工地
+
+
+def GetPlantFromCoatingGelLot(x):
+
+    x = x.strip()
+
+    if x == '':
+        return None
+    elif len(x) != 9 and len(x) != 10:
+        return "Cannot judge."
+    if x[-1] == 'A':
+        x = x[:-1]
+
+    if x[-2:] == '25':
+        return "TPC1"
+    elif x[-2:] == '98':
+        return "LTC1"
+    elif x[-2:] == '12':
+        return "LTC2"
+    else:
+        return "other"
+
+# 從鹼化Lot取得日期
+
+
+def GetDateFromSaponifiedLot(x):
+
+    from datetime import datetime
+    x = x.strip()
+
+    if x == '':
+        return None
+    elif x[0:2] != 'TH' and x[0:2] != 'TN' and x[0] != 'N' and x[0] != 'H':
+        return "Cannot judge."
+
+    if x[0] == 'T':
+        x = x[1:]
+
+    if x[1] in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:
+        y = 1945+ord(x[1])
+    else:
+        y = 1944+ord(x[1])
+    m = x[2:4]
+    d = x[4:6]
+    return datetime.strptime(str(y)+str(m)+str(d), '%Y%m%d')
+
+# 從原反品名取得UV膠種
+
+
+def GetAdhesivesFromGrade(x):
+
+    x = x.strip()
+
+    if x == '':
+        return None
+    if x.find('-') != -1:
+        pos = x.rfind('-')
+        if x[pos+1] == 'I' or x[pos+1] == 'J' or x[pos+1:pos+3] == 'SA':
+            return "水膠"
+        elif x[pos+1:pos+3] in ['SS', 'CR', 'ER', 'CH', 'FH', 'EH', 'GR', 'GH']:
+            return "UV膠"
+        else:
+            return "依目前編碼原則，無法判定膠種。此函數僅判斷TPL原反，非TPL不在此判定rule中"
+
+# 從原反品名取得UV膠種類
+
+
+def GetKindOfUVAdhesivesFromGrade(x):
+
+    x = x.strip()
+
+    if x == '':
+        return None
+    for i in ['ERS', 'GRS', 'NRS', 'PRS', 'FRS', 'EHS', 'GHS', 'NHS', 'PHS', 'FHS']:
+        if i in x:
+            return "15P"
+    for i in ['CRS', 'LRS', 'ORS', 'KRS', 'CHS', 'LHS', 'OHS', 'KHS']:
+        if i in x:
+            return "70T"
+    return "依目前編碼原則，無法判定UV膠的種類。"
+    
+# 從原反品名取得Series
+
+
+def GetSeriesFromLaminatedGrade(x):
+
+    import re
+
+    x = x.strip()
+
+    if x == '':
+        return ""
+    elif re.search(r'((.+)?-(.+)?)-(.+)?-.+', x) != None:
+        return re.search(r'((.+)?-(.+)?)-(.+)?-.+', x).group(1)
+    elif re.search(r'((.+)?)-(.+)?-.+', x) != None:
+        return re.search(r'((.+)?)-(.+)?-.+', x).group(1)
+    else:
+        return "Can't judge."
+
+# 從幅寬判定幅寬種類
+
+
+def GetKindOfWide(x):
+
+    x = float(str(x).strip())
+    if x == '':
+        return None
+    elif x >= 1.25 and x < 1.4:
+        return "一般幅"
+    elif x >= 1.4 and x < 1.46:
+        return "寬幅"
+    elif x >= 1.46 and x < 1.52:
+        return "大寬幅"
+    elif x >= 1.65 and x < 1.8:
+        return "小超寬幅"
+    elif x >= 1.8 and x <= 1.93:
+        return "超寬幅"
+    elif x > 1.93:
+        return "超超寬幅"
+    else:
+        return "Can't judge."
+
+# 從原反Lot取得日期
+
+
+def GetDateFromLaminatedLot(x):
+
+    from datetime import datetime
+
+    x = x.strip()
+
+    if x == '':
+        return None
+    elif len(x) != 9:
+        return None
+    elif x[1] in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']:
+        y = 1945+ord(x[1])
+    else:
+        y = 1944+ord(x[1])
+    if x[2] == 'A':
+        m = 10
+    elif x[2] == 'B':
+        m = 11
+    elif x[2] == 'C':
+        m = 12
+    else:
+        m = '0'+x[2]
+    d = x[3:5]
+    return datetime.strptime(str(y)+str(m)+str(d), '%Y%m%d')
+
+
+# 從PVALot取得PVA線別
+def GetSiteFromPVALot(x):
+
+    dict_kurare_site = {'1': '西條4號', '2': '西條5號', '3': '西條6號', 'Z': '西條7號', 'A': '倉敷1號',
+                        'B': '倉敷2號', 'C': '倉敷3號', 'D': '倉敷4號', 'E': '倉敷5號', 'F': '倉敷6號', '9': '西條3號'}
+    dict_nichigousei_site = {'3': '熊本3號', '4': '熊本4號', '5': '熊本5號'}
+
+    if x[0] == "M":
+        try:
+            return dict_nichigousei_site[x[5]]
+        except:
+            return None
+    elif x[0].isnumeric():
+        try:
+            return dict_kurare_site[x[5]]
+        except:
+            return None
+    else:
+        return None
+
+# 從原反品名取得PF膜
+
+
+def GetPFFromGrade(x):
+
+    import re
+
+    x = x.strip()
+
+    if x == '':
+        return None
+    if re.search(r'(.*)-(.*)-(.*)-(.*)', x) != None:
+        return re.search(r'(.*)-(.*)-(.*)-(.*)', x).group(3)
+    elif re.search(r'(.*)-(.*)-(.*)', x) != None:
+        return re.search(r'(.*)-(.*)-(.*)', x).group(2)
+    else:
+        return "Cannot judge."
+
+# 同Excel的Mid函數，用法亦相同
+
+
+def mid(x, offset, amount):
+    return x[offset-1:offset+amount-1]
+
+# 使用tkinter的Msgbox，僅顯示訊息用。如要YesNo等可另外製作
+
+
+def tk_msgbox(title, text):
+
+    from tkinter import Tk, messagebox
+
+    win_msg = Tk()
+    win_msg.withdraw()
+    messagebox.showwarning(title, text)
+    # messagebox.askyesno(title,text)
+    win_msg.destroy()
+
+# 非tkinter的Msgbox
+
+
+def msgbox(title, text, style):
+
+    import ctypes
+
+    return ctypes.windll.user32.MessageBoxW(0, text, title, style)
+# Styles:
+# 0 : OK
+# 1 : OK | Cancel
+# 2 : Abort | Retry | Ignore
+# 3 : Yes | No | Cancel
+# 4 : Yes | No
+# 5 : Retry | No
+# 6 : Cancel | Try Again | Continue
+
+
+if __name__ == '__main__':
+    pass
